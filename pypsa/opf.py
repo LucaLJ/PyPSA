@@ -525,50 +525,68 @@ def define_storage_variables_constraints(network,snapshots):
     fixed_soc = {}
 
     state_of_charge_set = get_switchable_as_dense(network, 'StorageUnit', 'state_of_charge_set', snapshots)
-
+    
+#    logger.warning("building soc constraints")
+#    logger.info("building constr")
     for su in sus.index:
         for i,sn in enumerate(snapshots):
-
-            soc[su,sn] =  [[],"==",0.]
-
-            elapsed_hours = network.snapshot_weightings.stores[sn]
-
-            if i == 0 and not sus.at[su,"cyclic_state_of_charge"]:
-                previous_state_of_charge = sus.at[su,"state_of_charge_initial"]
-                soc[su,sn][2] -= ((1-sus.at[su,"standing_loss"])**elapsed_hours
-                                  * previous_state_of_charge)
+            
+            # Luca: if neither cyclic nor initial are true for first timestep dont build this constraint
+            if i == 0 and not sus.at[su,"cyclic_state_of_charge"] and not sus.at[su,"state_of_charge_initial"]:
+                logger.warning('Neither cyclic_soc nor initial values are given for storage units.')
+                pass
             else:
-                previous_state_of_charge = model.state_of_charge[su,snapshots[i-1]]
-                soc[su,sn][0].append(((1-sus.at[su,"standing_loss"])**elapsed_hours,
-                                      previous_state_of_charge))
+                
+                soc[su,sn] =  [[],"==",0.]
+
+                elapsed_hours = network.snapshot_weightings.stores[sn]
+
+                if i == 0 and not sus.at[su,"cyclic_state_of_charge"]:
+                    previous_state_of_charge = sus.at[su,"state_of_charge_initial"]
+                    soc[su,sn][2] -= ((1-sus.at[su,"standing_loss"])**elapsed_hours
+                                      * previous_state_of_charge)
+                else:
+                    previous_state_of_charge = model.state_of_charge[su,snapshots[i-1]]
+                    soc[su,sn][0].append(((1-sus.at[su,"standing_loss"])**elapsed_hours,
+                                          previous_state_of_charge))
 
 
-            state_of_charge = state_of_charge_set.at[sn,su]
-            if pd.isnull(state_of_charge):
-                state_of_charge = model.state_of_charge[su,sn]
-                soc[su,sn][0].append((-1,state_of_charge))
-            else:
-                soc[su,sn][2] += state_of_charge
-                #make sure the variable is also set to the fixed state of charge
-                fixed_soc[su,sn] = [[(1,model.state_of_charge[su,sn])],"==",state_of_charge]
+                state_of_charge = state_of_charge_set.at[sn,su]
+                if pd.isnull(state_of_charge):
+                    state_of_charge = model.state_of_charge[su,sn]
+                    soc[su,sn][0].append((-1,state_of_charge))
+                else:
+                    soc[su,sn][2] += state_of_charge
+                    #make sure the variable is also set to the fixed state of charge
+                    fixed_soc[su,sn] = [[(1,model.state_of_charge[su,sn])],"==",state_of_charge]
 
-            soc[su,sn][0].append((sus.at[su,"efficiency_store"]
-                                  * elapsed_hours,model.storage_p_store[su,sn]))
-            soc[su,sn][0].append((-(1/sus.at[su,"efficiency_dispatch"]) * elapsed_hours,
-                                  model.storage_p_dispatch[su,sn]))
-            soc[su,sn][2] -= inflow.at[sn,su] * elapsed_hours
+                soc[su,sn][0].append((sus.at[su,"efficiency_store"]
+                                      * elapsed_hours,model.storage_p_store[su,sn]))
+                soc[su,sn][0].append((-(1/sus.at[su,"efficiency_dispatch"]) * elapsed_hours,
+                                      model.storage_p_dispatch[su,sn]))
+                soc[su,sn][2] -= inflow.at[sn,su] * elapsed_hours
 
     for su,sn in spill_index:
-        elapsed_hours = network.snapshot_weightings.stores[sn]
-        storage_p_spill = model.storage_p_spill[su,sn]
-        soc[su,sn][0].append((-1.*elapsed_hours,storage_p_spill))
+        if (su,sn) in soc:
+            elapsed_hours = network.snapshot_weightings.stores[sn]
+            storage_p_spill = model.storage_p_spill[su,sn]
+            soc[su,sn][0].append((-1.*elapsed_hours,storage_p_spill))
+        # Luca if the first constraint was not build dont try to add anything to it
+        else:
+            pass
 
-    l_constraint(model,"state_of_charge_constraint",
-                 soc,list(network.storage_units.index), snapshots)
+    # if cyclic is all false and initial is all false build the constraints without the first one
+    if not any(sus.loc[:,"cyclic_state_of_charge"]) and not any(sus.loc[:,"state_of_charge_initial"]):
+    
+        l_constraint(model,"state_of_charge_constraint",
+                     soc,list(network.storage_units.index), snapshots[1:])
+    else:
+    
+        l_constraint(model,"state_of_charge_constraint",
+                     soc,list(network.storage_units.index), snapshots)
 
     l_constraint(model, "state_of_charge_constraint_fixed",
                  fixed_soc, list(fixed_soc.keys()))
-
 
 
 def define_store_variables_constraints(network,snapshots):
