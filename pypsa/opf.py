@@ -526,14 +526,15 @@ def define_storage_variables_constraints(network,snapshots):
 
     state_of_charge_set = get_switchable_as_dense(network, 'StorageUnit', 'state_of_charge_set', snapshots)
     
-#    logger.warning("building soc constraints")
-#    logger.info("building constr")
+    # inform if there are neither initial nor cyclic constraints being build for storage units
+    if not any(sus.cyclic_state_of_charge) and len(sus[sus.state_of_charge_initial==0])==len(sus):
+        logger.warning('Neither cyclic_soc nor initial values are given for storage units.')
+
     for su in sus.index:
         for i,sn in enumerate(snapshots):
             
-            # Luca: if neither cyclic nor initial are true for first timestep dont build this constraint
-            if i == 0 and not sus.at[su,"cyclic_state_of_charge"] and not sus.at[su,"state_of_charge_initial"]:
-                logger.warning('Neither cyclic_soc nor initial values are given for storage units.')
+            # if neither cyclic nor initial are true for first timestep dont build this constraint
+            if i == 0 and not sus.at[su,"cyclic_state_of_charge"] and len(sus[sus.state_of_charge_initial==0])==len(sus):
                 pass
             else:
                 
@@ -571,7 +572,7 @@ def define_storage_variables_constraints(network,snapshots):
             elapsed_hours = network.snapshot_weightings.stores[sn]
             storage_p_spill = model.storage_p_spill[su,sn]
             soc[su,sn][0].append((-1.*elapsed_hours,storage_p_spill))
-        # Luca if the first constraint was not build dont try to add anything to it
+        # if the first constraint was not build dont try to add anything to it
         else:
             pass
 
@@ -1047,6 +1048,7 @@ def define_nodal_balances(network,snapshots):
         bus = network.storage_units.at[su,"bus"]
         sign = network.storage_units.at[su,"sign"]
         for sn in snapshots:
+        #Luca: here is issue
             network._p_balance[bus,sn].variables.append((sign,network.model.storage_p_dispatch[su,sn]))
             network._p_balance[bus,sn].variables.append((-sign,network.model.storage_p_store[su,sn]))
 
