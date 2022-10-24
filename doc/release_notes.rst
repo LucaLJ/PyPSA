@@ -7,6 +7,189 @@ Upcoming Release
 
 .. warning:: The features listed below are not released yet, but will be part of the next release! To use the features already you have to install the ``master`` branch, e.g. ``pip install git+https://github.com/pypsa/pypsa#egg=pypsa``.
 
+* A new optimization module `optimization` based on `Linopy <https://github.com/PyPSA/linopy>`_ was introduced. It aims at being as fast as the in-house optimization code and as flexible as the optimization with ``Pyomo``. A introduction to the optimization can be found at the `examples section
+  <https://pypsa.readthedocs.io/en/latest/examples/optimization-with-linopy.html>`_ a migration guide for extra functionalities can be found at `here
+  <https://pypsa.readthedocs.io/en/latest/examples/optimization-with-linopy-migrate-extra-functionalities.html>`_
+* A new module for a quick calculation of system relevant quantities was introduced. It is directly accessible via the new accessor `Network.statistics` which returns a table of values often calculated manually. At the same time `Network.statistics` allows to call individual functions, as `capex`, `opex`, `capacity_factor` etc.
+
+
+PyPSA 0.20.1 (6th October 2022)
+==============================
+
+* The representation of networks was modified to show the number of components and snapshots.
+* The performance of the consistency check function was improved. The consistency check was extended by validating the capacity expansion limits as well as global constraint attributes.
+* When applying network clustering algorithms, per unit time series are now aggregated using a capacity-weighted average and default aggregation strategies were adjusted.
+* The value of ``n.objective`` is now set to NaN for failed optimisation runs.
+* Added example notebook on how to model redispatch with PyPSA.
+* Added new network plotting example.
+* Bugfix for non-pyomo version of ``n.sclopf()``.
+* Accept ``pathlib.Path`` objects when importing networks with ``pypsa.Network()``.
+* Addressed ``.iteritems()`` deprecations.
+
+
+PyPSA 0.20.0 (26th July 2022)
+==============================
+
+This release contains new features for plotting and storing metadata with Network objects.
+
+* A new attribute ``n.meta`` was added to the Network object. This can be an arbitrary dictionary, and is used to store meta data about the network.
+
+* Improved support for individually normed colorbars in ``n.plot()`` for buses, lines, links, transformers with keyword arguments ``bus_norm``, ``line_norm``, ``link_norm``, ``transformer_norm``.
+
+  .. code-block:: python
+    :caption: Colorbar plotting example
+
+    import pypsa
+    import matplotlib.pyplot as plt
+    n = pypsa.examples.ac_dc_meshed()
+    norm = plt.Normalize(vmin=0, vmax=10)
+    n.plot(
+        bus_colors=n.buses.x,
+        bus_cmap='viridis',
+        bus_norm=norm
+    )
+    plt.colorbar(plt.cm.ScalarMappable(cmap='viridis', norm=norm))
+
+* New utility functions to add legends for line widths (:func:`pypsa.plot.add_legend_lines`), circles and pie chart areas (:func:`pypsa.plot.add_legend_circles`), and patch colors (:func:`pypsa.plot.add_legend_patches`).
+  See the following example:
+
+  .. code-block:: python
+    :caption: Legend plotting example
+
+    import pypsa
+    import matplotlib.pyplot as plt
+    import cartopy.crs as ccrs
+    from pypsa.plot import add_legend_circles
+
+    n = pypsa.examples.ac_dc_meshed()
+
+    fig, ax = plt.subplots(subplot_kw={"projection": ccrs.PlateCarree()})
+    n.plot(ax=ax, bus_sizes=1)
+
+    add_legend_circles(
+        ax,
+        [1, 0.5],
+        ["reference size", "reference size 2"],
+        legend_kw=dict(frameon=False, bbox_to_anchor=(1,0.1))
+    )
+
+* When iterating over components of a Subnetwork, only a those assets are included in the dataframes which are included in the subnetwork.
+
+* In ``n.plot()``, compute boundaries in all cases for consistent circle sizes. This is realised by setting a new default margin of 0.05.
+
+* Compatibility with pyomo 6.4.1.
+
+* Removed ``pypsa.stats`` module.
+
+* Extended defaults for the clustering of attributes in ``pypsa.networkclustering``.
+
+* Removed deprecated clustering algorithms in ``pypsa.networkclustering``.
+
+* Improved documentation and README.
+
+* Fix a few deprecations.
+
+* Improved test coverage, e.g. when copying networks.
+
+* Testing: ``pypower`` is not importable with newest numpy versions. Skip test if import fails.
+
+Special thanks for this release to @Cellophil,
+@txelldm and @rockstaedt for improving test coverage and documentation.
+
+
+PyPSA 0.19.3 (22nd April 2022)
+==============================
+
+* Apply pre-commit formats to support development (incl. black formatting,
+  jupyter cleanup, import sorting, preventing large file uploads). This will
+  distort ``git blame`` functionality, which can be fixed by running ``git
+  config blame.ignoreRevsFile .git-blame-ignore-revs`` inside the PyPSA
+  repository. Run ``pre-commit install`` to set up locally.
+* Change message when exporting and importing networks without a set ``network_name``.
+  Fixes [`#381 <https://github.com/PyPSA/PyPSA/issues/381>`_].
+* Greedy Modularity Maximisation was introduced as new spatial
+  clustering method [`#377 <https://github.com/PyPSA/PyPSA/pull/377>`_].
+
+PyPSA 0.19.2 (7th March 2022)
+=============================
+
+* Add standard line type for 750 kV transmission line.
+
+PyPSA 0.19.1 (18th February 2022)
+=================================
+
+* When setting ramp limits for links and calling ``Network.lopf`` with ``pyomo=False``, an unexpected KeyError was raised. This was fixed by correctly accessing the data frame referring to the power dispatch of links.
+
+
+PyPSA 0.19.0 (11th February 2022)
+=================================
+
+This release contains new features for ramping constraints in link components,
+hierarchical network clustering functionality, and an interface to the
+open-source HiGHS solver.
+
+**New Features**
+
+* Ramp limits for ``Links``. The ``Link`` component has two new attributes, :code:`ramp_limit_up` and
+  :code:`ramp_limit_down`, which limits the marginal power increase equivalent to the
+  implementation for generators. The new attributes are only considered when
+  running ``network.lopf(pyomo=False)``.
+
+* Hierarchical Agglomerative Clustering (HAC) was introduced as new spatial
+  clustering method [`#289 <https://github.com/PyPSA/PyPSA/pull/289>`_].
+
+* Clustering networks now also supports the clustering of time-series associated
+  to lines.
+
+* Add open-source `HiGHS solver <https://github.com/ERGO-Code/HiGHS>`_.
+
+* A new convenience function ``Network.get_committable_i`` was added. This returns
+  an index containing all committable assets of component ``c``. In case that
+  component ``c`` does not support committable assets, it returns an empty
+  dataframe.
+
+* A warning message is shown if a network contains one or more links with an
+  :code:`efficiency` smaller than 1 and a negative value for :code:`p_min_pu`
+  [`#320 <https://github.com/PyPSA/PyPSA/pull/320>`_].
+
+* New example for spatial clustering.
+
+* Speed-up of ``network.plot()`` by only plotting buses with non-zero size.
+
+* Increased test coverage.
+
+**Changes**
+
+* The names of the indexes in static dataframes are now set to the component
+  names. So, the index of ``n.generators`` has the name 'Generator'. The same
+  accounts for the columns of the timeseries.
+
+* The snapshot levels of a multi-indexed snapshot were renamed to ['period',
+  'timestep'], the name of the index was set to 'snapshot'. This makes the
+  snapshot name coherent for single and multi-indexed snapshots.
+
+**Bugs and Compatibility**
+
+* Compatibility with ``pandas>=1.4``.
+
+* Drop support for Python 3.6 in accordance with its
+  [end-of-life](https://endoflife.date/python).
+
+* Use ``nx.Graph`` instead of ``nx.OrderedGraph`` which guarantees order is
+  preserved for Python 3.7 and above.
+
+* Add assert: CBC solver does not work with '>' and '<'.
+
+* When running ``network.lopf(pyomo=False)``, the ramp limits did not take
+  the time step right before the optimization horizon into account (relevant for
+  rolling horizon optimization). This is now fixed.
+
+* Fix bug when multi-links are defined but the network has no links.
+
+Special thanks for this release to Samuel Matthew Dumlao (@smdumlao) for
+implementing the ramp limits for Links in PyPSA, Martha Frysztacki (@martacki) for
+implementing the hierarchical network clustering, and Max Parzen (@pz-max) for
+implementing the HiGHS solver interface.
 
 PyPSA 0.18.1 (15th October 2021)
 ================================
@@ -24,6 +207,9 @@ PyPSA 0.18.1 (15th October 2021)
   ``busmap_by_spectral_clustering()``, ``spectral_clustering()``, ``busmap_by_louvain()``,
   ``louvain_clustering()``, ``busmap_by_rectangular_grid()``, ``rectangular_grid_clustering()``
   and ``stubs_clustering()`` were deprecated and will be removed in v0.20.
+
+* Distance measures for function ``busmap_by_spectral()`` and ``busmap_by_louvain()``
+  were adapted to electrical distance (``s_nom/|r+i*x|``) (before: ``num_parallel``)
 
 * In ``pypsa.networkclustering``, strip the string of the clustered
   component name. Not doing this had caused troubles for components with an
@@ -114,6 +300,8 @@ documentation's examples section as well as compatibility and bug fixes.
 
 * ``n.snapshots`` are now a property, hence assigning values with
   ``n.snapshots = values`` is the same as ``n.set_snapshots(values)``.
+
+* Remove deprecated function ``geo.area_from_lon_lat_poly``.
 
 **Deprecations**
 
@@ -344,7 +532,7 @@ This release contains new improvements and bug fixes.
   any. See the `unit commitment documentation
   <https://pypsa.readthedocs.io/en/latest/optimal_power_flow.html#generator-unit-commitment-constraints>`_
   for full details. The `UC example
-  <https://pypsa.org/examples/unit-commitment.html>`_ has been updated
+  <https://pypsa.readthedocs.io/en/latest/examples/unit-commitment.html>`_ has been updated
   with a rolling horizon example at the end.
 * Documentation is now available on `readthedocs
   <https://pypsa.readthedocs.io/>`_, with information about functions
@@ -479,7 +667,7 @@ internal API changes.
   sections :ref:`components-links-multiple-outputs` and
   :ref:`opf-links` and the `example of a CHP with a fixed power-heat
   ratio
-  <https://www.pypsa.org/examples/chp-fixed-heat-power-ratio.html>`_.
+  <https://pypsa.readthedocs.io/en/latest/examples/chp-fixed-heat-power-ratio.html>`_.
 * Networks can now be exported to and imported from netCDF files with
   ``network.export_to_netcdf()`` and
   ``network.import_from_netcdf()``. This is faster than using CSV
@@ -578,9 +766,7 @@ This release contains new features but no changes to existing APIs.
   interactive plot in Jupyter notebooks using the `plotly
   <https://plot.ly/python/>`_ library. This reveals bus and branch
   properties when the mouse hovers over them and allows users to
-  easily zoom in and out on the network. See the `SciGRID example
-  <https://pypsa.org/examples/scigrid-lopf-then-pf-plotly.html>`_ for
-  a showcase of this feature and also the (sparse) documentation
+  easily zoom in and out on the network. See the (sparse) documentation
   :doc:`plotting`.
 * There is a new function ``network.madd()`` for adding multiple new
   components to the network. This is significantly faster than
@@ -648,12 +834,12 @@ important API changes.
 * Component attributes which are strings are now better handled on
   import and in the consistency checking.
 * There is a new `generation investment screening curve example
-  <https://pypsa.org/examples/generation-investment-screening-curve.html>`_
+  <https://pypsa.readthedocs.io/en/latest/examples/generation-investment-screening-curve.html>`_
   showing the long-term equilibrium of generation investment for a
   given load profile and comparing it to a screening curve
   analysis.
 * There is a new `logging example
-  <https://pypsa.org/examples/logging-demo.html>`_ that demonstrates
+  <https://pypsa.readthedocs.io/en/latest/examples/logging-demo.html>`_ that demonstrates
   how to control the level of logging that PyPSA reports back,
   e.g. error/warning/info/debug messages.
 * Sundry other bug fixes and improvements.
@@ -678,13 +864,13 @@ changes.
   is created. Minimum part loads, minimum up times, minimum down
   times, start up costs and shut down costs are implemented. See the
   documentation at :ref:`unit-commitment` and the `unit commitment
-  example <https://pypsa.org/examples/unit-commitment.html>`_. Note
+  example <https://pypsa.readthedocs.io/en/latest/examples/unit-commitment.html>`_. Note
   that a generator cannot currently have both unit commitment and
   capacity expansion optimisation.
 * Generator ramping limits have also been implemented for all
   generators. See the documentation at :ref:`ramping` and the `unit
   commitment example
-  <https://pypsa.org/examples/unit-commitment.html>`_.
+  <https://pypsa.readthedocs.io/en/latest/examples/unit-commitment.html>`_.
 * Different mathematically-equivalent formulations for the Linear
   Optimal Power Flow (LOPF) are now documented in :ref:`formulations`
   and the arXiv preprint paper `Linear Optimal Power Flow Using Cycle
@@ -730,7 +916,7 @@ changes to the internal API.
   for transformers with types. The tap changer can be defined on the
   primary side or the secondary side. In the PF there was a sign error in the implementation of the transformer
   ``phase_shift``, which has now been fixed. In the LPF and LOPF angle formulation the ``phase_shift`` has now been
-  implemented consistently. See the new `transformer example <https://pypsa.org/examples/transformer_example.html>`_.
+  implemented consistently. See the new `transformer example <https://pypsa.readthedocs.io/en/latest/examples/transformer_example.html>`_.
 * There is now a rudimentary import function for pandapower networks,
   but it doesn't yet work with all switches and 3-winding
   transformers.
@@ -765,7 +951,7 @@ warnings.
   so that e.g. heat pump Coefficient of Performance (COP) can change
   over time due to ambient temperature variations (see the `heat pump
   example
-  <http://www.pypsa.org/examples/power-to-heat-water-tank.html>`_).
+  <https://pypsa.readthedocs.io/en/latest/examples/power-to-heat-water-tank.html>`_).
 * ``network.snapshots`` is now cast to a ``pandas.Index``.
 * There are new warnings, including when you attach components to
   non-existent buses.
@@ -815,7 +1001,7 @@ particularly regarding time-varying component attributes.
   components are well defined; see :doc:`troubleshooting`.
 
 
-All `examples <http://www.pypsa.org/examples/>`_ have been updated to
+All `examples <https://pypsa.readthedocs.io/en/latest/examples-basic.html>`_ have been updated to
 accommodate the changes listed below.
 
 
@@ -855,12 +1041,12 @@ your old code. Models for Combined Heat and Power (CHP) units, heat
 pumps, resistive Power-to-Heat (P2H), Power-to-Gas (P2G), battery
 electric vehicles (BEVs) and chained hydro reservoirs can now be built
 (see the `sector coupling examples
-<http://www.pypsa.org/examples/#coupling-to-other-energy-sectors>`_). The
+<https://pypsa.readthedocs.io/en/latest/examples-sector_coupling.html>`_). The
 refactoring of time-dependent variable handling has been postponed
 until the 0.7.0 release. In 0.7.0 the object interface to attributes
 may also be removed; see below.
 
-All `examples <http://www.pypsa.org/examples/>`_ have been updated to
+All `examples <https://pypsa.readthedocs.io/en/latest/examples-basic.html>`_ have been updated to
 accommodate the changes listed below.
 
 Sector coupling
@@ -873,7 +1059,7 @@ Sector coupling
   for storing and dispatching. The ``Generator`` is equivalent to a
   ``Store`` with a lossy ``Link``. There is an `example which shows
   the equivalences
-  <http://www.pypsa.org/examples/replace-generator-storage-units-with-store.html>`_.
+  <https://pypsa.readthedocs.io/en/latest/examples/replace-generator-storage-units-with-store.html>`_.
 
 * components, opt: The ``Source`` component and the ``Generator``
   attribute ``gen.source`` have been renamed ``Carrier`` and
@@ -931,7 +1117,7 @@ summer of 2016.
 An example of the coupling between electric and heating sectors can be
 found in the GitHub repository at
 ``pypsa/examples/coupling-with-heating/`` and at
-`<http://www.pypsa.org/examples/lopf-with-heating.html>`_.
+`<https://pypsa.readthedocs.io/en/latest/examples/lopf-with-heating.html>`_.
 
 
 * components: To allow other energy carriers, the attribute
@@ -1102,7 +1288,7 @@ main component pandas.DataFrame.
 Release process
 ===============
 
-* Update ``release_notes.rst``
+* Update ``doc/release_notes.rst``
 * Update version in ``setup.py``, ``doc/conf.py``, ``pypsa/__init__.py``
 * ``git commit`` and put release notes in commit message
 * ``git tag v0.x.0``

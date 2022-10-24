@@ -1,70 +1,82 @@
-import pypsa
-import pytest
+# -*- coding: utf-8 -*-
 import os
+from pathlib import Path
+
 import pandas as pd
-import numpy as np
+import pytest
 
-@pytest.fixture
-def network():
-    csv_folder_name = os.path.join(
-        os.path.dirname(__file__),
-        "..",
-        "examples",
-        "scigrid-de",
-        "scigrid-with-load-gen-trafos",
-    )
-    return pypsa.Network(csv_folder_name)
+import pypsa
 
 
-@pytest.fixture
-def network_mi():
-    csv_folder_name = os.path.join(
-        os.path.dirname(__file__),
-        "..",
-        "examples",
-        "ac-dc-meshed",
-        "ac-dc-data",
-    )
-    n = pypsa.Network(csv_folder_name)
-    n.snapshots = pd.MultiIndex.from_product([[2013], n.snapshots])
-    n.generators_t.p.loc[:,:] = np.random.rand(*n.generators_t.p.shape)
-    return n
-
-
-def test_netcdf_io(network, tmpdir):
+@pytest.mark.parametrize("meta", [{"test": "test"}, {"test": {"test": "test"}}])
+def test_netcdf_io(scipy_network, tmpdir, meta):
     fn = os.path.join(tmpdir, "netcdf_export.nc")
-    network.export_to_netcdf(fn)
+    scipy_network.meta = meta
+    scipy_network.export_to_netcdf(fn)
+    reloaded = pypsa.Network(fn)
+    assert reloaded.meta == scipy_network.meta
+
+
+def test_netcdf_io_Path(scipy_network, tmpdir):
+    fn = Path(os.path.join(tmpdir, "netcdf_export.nc"))
+    scipy_network.export_to_netcdf(fn)
     pypsa.Network(fn)
 
 
-def test_csv_io(network, tmpdir):
+@pytest.mark.parametrize("meta", [{"test": "test"}, {"test": {"test": "test"}}])
+def test_csv_io(scipy_network, tmpdir, meta):
     fn = os.path.join(tmpdir, "csv_export")
-    network.export_to_csv_folder(fn)
+    scipy_network.meta = meta
+    scipy_network.export_to_csv_folder(fn)
+    pypsa.Network(fn)
+    reloaded = pypsa.Network(fn)
+    assert reloaded.meta == scipy_network.meta
+
+
+def test_csv_io_Path(scipy_network, tmpdir):
+    fn = Path(os.path.join(tmpdir, "csv_export"))
+    scipy_network.export_to_csv_folder(fn)
     pypsa.Network(fn)
 
 
-def test_hdf5_io(network, tmpdir):
+@pytest.mark.parametrize("meta", [{"test": "test"}, {"test": {"test": "test"}}])
+def test_hdf5_io(scipy_network, tmpdir, meta):
     fn = os.path.join(tmpdir, "hdf5_export.h5")
-    network.export_to_hdf5(fn)
+    scipy_network.meta = meta
+    scipy_network.export_to_hdf5(fn)
+    pypsa.Network(fn)
+    reloaded = pypsa.Network(fn)
+    assert reloaded.meta == scipy_network.meta
+
+
+def test_hdf5_io_Path(scipy_network, tmpdir):
+    fn = Path(os.path.join(tmpdir, "hdf5_export.h5"))
+    scipy_network.export_to_hdf5(fn)
     pypsa.Network(fn)
 
 
-def test_netcdf_io_multiindexed(network_mi, tmpdir):
+def test_netcdf_io_multiindexed(ac_dc_network_multiindexed, tmpdir):
     fn = os.path.join(tmpdir, "netcdf_export.nc")
-    network_mi.export_to_netcdf(fn)
+    ac_dc_network_multiindexed.export_to_netcdf(fn)
     m = pypsa.Network(fn)
-    pd.testing.assert_frame_equal(m.generators_t.p, network_mi.generators_t.p)
+    pd.testing.assert_frame_equal(
+        m.generators_t.p, ac_dc_network_multiindexed.generators_t.p
+    )
 
 
-def test_csv_io(network_mi, tmpdir):
+def test_csv_io_multiindexed(ac_dc_network_multiindexed, tmpdir):
     fn = os.path.join(tmpdir, "csv_export")
-    network_mi.export_to_csv_folder(fn)
+    ac_dc_network_multiindexed.export_to_csv_folder(fn)
     m = pypsa.Network(fn)
-    pd.testing.assert_frame_equal(m.generators_t.p, network_mi.generators_t.p)
+    pd.testing.assert_frame_equal(
+        m.generators_t.p, ac_dc_network_multiindexed.generators_t.p
+    )
 
 
-def test_hdf5_io(network_mi, tmpdir):
+def test_hdf5_io_multiindexed(ac_dc_network_multiindexed, tmpdir):
     fn = os.path.join(tmpdir, "hdf5_export.h5")
-    network_mi.export_to_hdf5(fn)
+    ac_dc_network_multiindexed.export_to_hdf5(fn)
     m = pypsa.Network(fn)
-    pd.testing.assert_frame_equal(m.generators_t.p, network_mi.generators_t.p)
+    pd.testing.assert_frame_equal(
+        m.generators_t.p, ac_dc_network_multiindexed.generators_t.p
+    )
